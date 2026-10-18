@@ -11,12 +11,17 @@ const nativeDir = join(root, ".native");
 const mode = process.argv[2];
 
 if (mode === "prepare") {
-  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  const cap = Object.fromEntries(Object.entries(pkg.dependencies).filter(([k]) => k.startsWith("@capacitor/")));
+  // Versões fixas (funciona mesmo neste repositório sem o package.json do app).
+  const cap = {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/local-notifications": "^8.3.1",
+  };
   mkdirSync(nativeDir, { recursive: true });
   writeFileSync(
     join(nativeDir, "package.json"),
-    JSON.stringify({ name: "central-native", private: true, dependencies: cap, devDependencies: { "@capacitor/cli": pkg.devDependencies["@capacitor/cli"], typescript: "^5.8.3" } }, null, 2),
+    JSON.stringify({ name: "central-native", private: true, dependencies: cap, devDependencies: { "@capacitor/cli": "^8.5.3", typescript: "^5.8.3" } }, null, 2),
   );
   cpSync(join(root, "capacitor.config.ts"), join(nativeDir, "capacitor.config.ts"));
   cpSync(join(root, "www"), join(nativeDir, "www"), { recursive: true });
