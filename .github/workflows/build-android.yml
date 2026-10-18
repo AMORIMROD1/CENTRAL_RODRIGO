@@ -1,0 +1,50 @@
+name: Build APK Android (Central)
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "Endereço do app publicado (deixe vazio para usar o padrão)"
+        required: false
+        default: ""
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Preparar projeto nativo
+        env:
+          APP_URL: ${{ inputs.app_url }}
+        run: |
+          [ -z "$APP_URL" ] && unset APP_URL
+          node scripts/android.mjs prepare
+          cd .native
+          npm install --ignore-scripts --no-audit --no-fund
+          npx cap add android
+          node ../scripts/android.mjs patch
+          npx cap sync android
+
+      - name: Compilar APK
+        env:
+          APP_URL: ${{ inputs.app_url }}
+        run: |
+          cd .native/android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: central-apk
+          path: .native/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
