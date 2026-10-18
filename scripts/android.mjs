@@ -2,7 +2,7 @@
 //   node scripts/android.mjs prepare   -> cria .native/ (mini-projeto só com o Capacitor)
 //   node scripts/android.mjs patch     -> ajusta o AndroidManifest em .native/android
 // Roda no GitHub Actions (ver .github/workflows/build-android.yml).
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -82,8 +82,23 @@ if (mode === "prepare") {
   // Código nativo do alarme (Java) -> pacote do app.
   const destino = join(nativeDir, "android/app/src/main/java/app/lovable/centralrodrigo");
   mkdirSync(destino, { recursive: true });
-  const origem = join(root, "native-src");
-  for (const f of readdirSync(origem).filter((n) => n.endsWith(".java"))) cpSync(join(origem, f), join(destino, f));
+  // Procura os .java em qualquer pasta do repositório (usa o primeiro de cada nome).
+  const achados = new Map();
+  const ignorar = new Set([".git", ".native", "node_modules", ".github"]);
+  const varrer = (dir) => {
+    for (const nome of readdirSync(dir).sort()) {
+      if (ignorar.has(nome)) continue;
+      const caminho = join(dir, nome);
+      if (statSync(caminho).isDirectory()) varrer(caminho);
+      else if (nome.endsWith(".java") && !achados.has(nome)) achados.set(nome, caminho);
+    }
+  };
+  varrer(root);
+  const esperados = ["AlarmeActivity", "AlarmeAgenda", "AlarmeBootReceiver", "AlarmePlugin", "AlarmeReceiver", "AlarmeService", "MainActivity"];
+  const faltando = esperados.filter((n) => !achados.has(`${n}.java`));
+  if (faltando.length) throw new Error(`Arquivos .java não encontrados no repositório: ${faltando.join(", ")}`);
+  for (const [nome, caminho] of achados) cpSync(caminho, join(destino, nome));
+  console.log("Arquivos .java copiados:", [...achados.keys()].join(", "));
   console.log("OK: manifest e código nativo atualizados. Permissões novas:", add.length);
 } else {
   console.error("Uso: node scripts/android.mjs prepare|patch");
