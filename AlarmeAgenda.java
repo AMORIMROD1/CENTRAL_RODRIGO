@@ -74,6 +74,7 @@ public final class AlarmeAgenda {
         Intent i = new Intent(c, AlarmeReceiver.class);
         i.setAction(ACAO_DISPARO);
         i.putExtra("id", id);
+        i.putExtra("pid", a.optInt("pid", id));
         i.putExtra("titulo", a.optString("titulo", "Alarme"));
         i.putExtra("mensagem", a.optString("mensagem", ""));
         i.putExtra("rota", a.optString("rota", "/hoje"));

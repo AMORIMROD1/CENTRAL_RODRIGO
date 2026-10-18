@@ -109,7 +109,7 @@ public class AlarmeService extends Service {
             wakeLock.acquire(LIMITE_MS);
         }
 
-        if (!"silencioso".equals(extras.getString("som", "padrao"))) iniciarSom(extras.getString("som", "padrao"));
+        if (!"silencioso".equals(extras.getString("som", "padrao"))) iniciarSom(extras.getString("som", "padrao"), extras.getInt("pid", extras.getInt("id", 0)));
         if (extras.getBoolean("vibrar", true)) iniciarVibracao();
 
         // Com a permissão "exibir sobre outros apps" o Android deixa abrir a tela direto.
@@ -124,7 +124,7 @@ public class AlarmeService extends Service {
         return PendingIntent.getService(this, codigo, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
-    private void iniciarSom(String som) {
+    private void iniciarSom(String som, int pid) {
         try {
             AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
             if (am != null) {
@@ -134,14 +134,32 @@ public class AlarmeService extends Service {
                     am.setStreamVolume(AudioManager.STREAM_ALARM, minimo, 0);
                 }
             }
+            AudioAttributes atrib = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build();
+            // Música escolhida para este alarme (se houver); senão, o toque padrão.
+            String musica = AlarmePerso.caminhoValido(AlarmePerso.obter(this, pid), "musica");
+            if (musica != null) {
+                try {
+                    player = new MediaPlayer();
+                    player.setAudioAttributes(atrib);
+                    player.setDataSource(musica);
+                    player.setLooping(true);
+                    player.prepare();
+                    player.start();
+                    return;
+                } catch (Exception e) {
+                    android.util.Log.e("Alarme", "Música escolhida falhou, usando toque padrão", e);
+                    try { if (player != null) player.release(); } catch (Exception ignored) {}
+                    player = null;
+                }
+            }
             Uri uri = RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_ALARM);
             if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
             if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             player = new MediaPlayer();
-            player.setAudioAttributes(new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build());
+            player.setAudioAttributes(atrib);
             player.setDataSource(this, uri);
             player.setLooping(true);
             player.prepare();
@@ -169,6 +187,7 @@ public class AlarmeService extends Service {
             if (atual != null) {
                 JSONObject a = new JSONObject();
                 a.put("id", atual.getInt("id", 0));
+                a.put("pid", atual.getInt("pid", atual.getInt("id", 0)));
                 a.put("titulo", atual.getString("titulo", "Alarme"));
                 a.put("mensagem", atual.getString("mensagem", ""));
                 a.put("rota", atual.getString("rota", "/hoje"));
